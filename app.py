@@ -5,22 +5,28 @@ import time
 import requests
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from picamera2 import Picamera2, MappedArray
 from datetime import datetime
+from picamera2 import Picamera2
+from picamera2.encoders import H264Encoder
+from picamera2.outputs import FileOutput
 
-# Configurations
-GO_BACKEND_UPLOAD_URL = "http://<your-go-backend-ip>:<port>/upload"  # e.g., http://192.168.1.100:8080/upload
+# === Config ===
+GO_BACKEND_UPLOAD_URL = "http://<your-backend-ip>:<port>/upload"  # e.g., http://192.168.1.100:8080/upload
 CHUNK_DURATION_SEC = 10
 MJPEG_PORT = 8000
 FRAME_RATE = 24
 RESOLUTION = (640, 480)
 
+# === Initialize Camera ===
 picam2 = Picamera2()
-video_config = picam2.create_video_configuration(main={"size": RESOLUTION, "format": "RGB888"})
+video_config = picam2.create_video_configuration(
+    main={"size": RESOLUTION, "format": "YUV420"},
+    encode="main"
+)
 picam2.configure(video_config)
 picam2.start()
 
-# MJPEG Streaming Server
+# === MJPEG Stream Server ===
 class MJPEGHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -41,16 +47,20 @@ def start_mjpeg_server():
     print(f"[STREAMING] MJPEG available at http://<pi-ip>:{MJPEG_PORT}")
     server.serve_forever()
 
-# Recording and Upload Thread
+# === Record and Upload Thread ===
 def record_and_upload():
     while True:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = f"/tmp/vid_{timestamp}.mp4"
         print(f"[RECORDING] {output_path}")
 
-        # Record with ffmpeg directly from Pi camera (via raw stream)
-        record_cmd = f"ffmpeg -y -f v4l2 -framerate {FRAME_RATE} -video_size {RESOLUTION[0]}x{RESOLUTION[1]} -i /dev/video0 -t {CHUNK_DURATION_SEC} -c:v libx264 {output_path}"
-        os.system(record_cmd)
+        encoder = H264Encoder(bitrate=1000000)
+        output = FileOutput(output_path)
+
+        # Correct way: start recording with encoder and output
+        picam2.start_recording(encoder, output)
+        time.sleep(CHUNK_DURATION_SEC)
+        picam2.stop_recording()
 
         print(f"[UPLOAD] Sending {output_path}")
         try:
@@ -61,13 +71,16 @@ def record_and_upload():
         except Exception as e:
             print(f"[UPLOAD ERROR] {e}")
         finally:
-            os.remove(output_path)
+            try:
+                os.remove(output_path)
+            except FileNotFoundError:
+                pass
 
-# Start both threads
+# === Start Threads ===
 threading.Thread(target=start_mjpeg_server, daemon=True).start()
 threading.Thread(target=record_and_upload, daemon=True).start()
 
-# Keep alive
+# === Keep Alive ===
 try:
     while True:
         time.sleep(1)
