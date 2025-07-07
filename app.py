@@ -11,7 +11,7 @@ from picamera2.encoders import H264Encoder
 from picamera2.outputs import FileOutput
 
 # === Config ===
-GO_BACKEND_UPLOAD_URL = "http://<your-backend-ip>:<port>/upload"  # e.g., http://192.168.1.100:8080/upload
+GO_BACKEND_UPLOAD_URL = "http://192.168.1.84:8080/upload"  # e.g., http://192.168.1.100:8080/upload
 CHUNK_DURATION_SEC = 10
 MJPEG_PORT = 8000
 FRAME_RATE = 24
@@ -20,7 +20,7 @@ RESOLUTION = (640, 480)
 # === Initialize Camera ===
 picam2 = Picamera2()
 video_config = picam2.create_video_configuration(
-    main={"size": RESOLUTION, "format": "YUV420"},
+    main={"size": RESOLUTION, "format": "RGB888"},
     encode="main"
 )
 picam2.configure(video_config)
@@ -35,6 +35,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         try:
             while True:
                 frame = picam2.capture_array()
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 _, jpeg = cv2.imencode('.jpg', frame)
                 self.wfile.write(b'--frame\r\n')
                 self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
@@ -65,8 +66,12 @@ def record_and_upload():
         print(f"[UPLOAD] Sending {output_path}")
         try:
             with open(output_path, 'rb') as f:
-                files = {'file': (os.path.basename(output_path), f, 'video/mp4')}
+                # files = {'file': (os.path.basename(output_path), f, 'video/mp4')}
+                # r = requests.post(GO_BACKEND_UPLOAD_URL, files=files)
+
+                files = {'file': (os.path.basename(output_path), open(output_path, 'rb'), 'video/mp4')}
                 r = requests.post(GO_BACKEND_UPLOAD_URL, files=files)
+
                 print(f"[UPLOAD] Status {r.status_code}")
         except Exception as e:
             print(f"[UPLOAD ERROR] {e}")
