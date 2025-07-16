@@ -90,3 +90,45 @@ streamServer.listen(STREAM_PORT);
 
 console.log('Listening for incomming MPEG-TS Stream on http://127.0.0.1:'+STREAM_PORT+'/<secret>');
 console.log('Awaiting WebSocket connections on ws://127.0.0.1:'+WEBSOCKET_PORT+'/');
+
+
+///  SECOND WEBSOCKET FOR CONTROL
+
+// Add a second WebSocket Server for control commands
+var controlServer = new WebSocket.Server({ port: 8090 });
+controlServer.connectionCount = 0;
+var piClients = new Set();
+
+controlServer.on('connection', function(socket, req) {
+	controlServer.connectionCount++;
+	console.log('New Control Connection:', req.socket.remoteAddress);
+	
+	// First message should identify client
+	socket.on('message', function(message) {
+		try {
+			var msg = JSON.parse(message);
+			if (msg.client === "pi") {
+				console.log("Registered a Pi client");
+				piClients.add(socket);
+			} else if (msg.client === "browser" && msg.command) {
+				console.log("Browser Command:", msg.command);
+				// Forward to all registered Pi clients
+				piClients.forEach(function(piSocket) {
+					if (piSocket.readyState === WebSocket.OPEN) {
+						piSocket.send(JSON.stringify({ command: msg.command }));
+					}
+				});
+			}
+		} catch (e) {
+			console.log("Invalid message", e);
+		}
+	});
+
+	socket.on('close', function() {
+		controlServer.connectionCount--;
+		piClients.delete(socket);
+		console.log('Control Client Disconnected');
+	});
+});
+
+console.log('Control WebSocket running on ws://127.0.0.1:8090/');
