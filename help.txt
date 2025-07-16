@@ -10,7 +10,7 @@ libcamera-vid -t 0 --width 320 --height 240 --framerate 15 --codec yuv420 --imme
 
 libcamera-vid -t 0 --width 320 --height 240 --framerate 15 --codec yuv420 --immediate --flush -o - | ffmpeg -probesize 32 -analyzeduration 0 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -r 15 -f rawvideo -pixel_format yuv420p -video_size 320x240 -framerate 15 -i - -c:v libx264 -preset ultrafast -b:v 1000k -g 15 -bf 0 -tune zerolatency -x264opts no-scenecut -c:a aac -b:a 64k -ar 44100 -f mpegts -mpegts_copyts 1 -muxdelay 0 -muxpreload 0 -max_interleave_delta 0 http://54.241.79.228:8081/supersecret
 
-54.241.79.228
+52.53.192.72
 
 node websocket-relay.js supersecret 8081 8082
 on ec2 instance

@@ -30,13 +30,13 @@ def step_motor(motor_id, direction, steps, delay=0.001):
 
 def handle_command(command):
     if command == "up":
-        step_motor(1, direction=1, steps=100)
-    elif command == "down":
-        step_motor(1, direction=0, steps=100)
-    elif command == "right":
         step_motor(2, direction=1, steps=100)
-    elif command == "left":
+    elif command == "down":
         step_motor(2, direction=0, steps=100)
+    elif command == "right":
+        step_motor(1, direction=1, steps=100)
+    elif command == "left":
+        step_motor(1, direction=0, steps=100)
 
 def on_message(ws, message):
     try:
@@ -55,7 +55,7 @@ def on_close(ws, close_status_code, close_msg):
 
 def start_websocket():
     ws = websocket.WebSocketApp(
-        "ws://<EC2_PUBLIC_IP>:8090",
+        "ws://52.53.192.72:8090",
         on_message=on_message,
         on_open=on_open,
         on_close=on_close
@@ -69,9 +69,13 @@ def start_video_stream():
         "ffmpeg -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 "
         "-f rawvideo -pixel_format yuv420p -video_size 640x480 -framerate 25 -i - "
         "-c:v libx264 -preset ultrafast -b:v 2000k -c:a aac -b:a 128k -ar 44100 "
-        "-f mpegts -mpegts_copyts 1 http://<EC2_PUBLIC_IP>:8081/supersecret"
+        "-f mpegts -mpegts_copyts 1 http://52.53.192.72:8081/supersecret"
     ]
     subprocess.Popen(cmd)
+
+
+# libcamera-vid -t 0 --width 640 --height 480 --framerate 25 --codec yuv420 -o - | ffmpeg -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -f rawvideo -pixel_format yuv420p -video_size 640x480 -framerate 25 -i - -c:v libx264 -preset ultrafast -b:v 2000k -c:a aac -b:a 128k -ar 44100 -f mpegts -mpegts_copyts 1 http://52.53.192.72:8081/supersecret
+
 
 # --- Main ---
 try:
